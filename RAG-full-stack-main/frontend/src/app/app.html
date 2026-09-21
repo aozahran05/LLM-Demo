@@ -1,0 +1,38 @@
+<div class="chat-container">
+
+  <header class="chat-header">
+    <h1>InvoiceQ AI</h1>
+    <p>Ask anything about your invoices</p>
+  </header>
+
+  <main class="chat-messages">
+
+    @for (msg of messages; track $index) {
+      <div
+        class="message"
+        [class.user-message]="msg.sender === 'user'"
+        [class.bot-message]="msg.sender === 'bot'">
+
+        {{ msg.text }}
+
+      </div>
+    }
+
+  </main>
+
+  <footer class="chat-input">
+
+    <input
+      type="text"
+      placeholder="Ask about your invoices..."
+      [(ngModel)]="message"
+      (keyup.enter)="sendMessage()"
+    />
+
+    <button (click)="sendMessage()">
+      Send
+    </button>
+
+  </footer>
+
+</div>

@@ -1,0 +1,16 @@
+# IntelliJ
+.idea/
+*.iml
+
+# Java / Maven
+target/
+backend/target/
+
+# Angular / Node
+frontend/node_modules/
+frontend/.angular/
+frontend/dist/
+
+# Environment files
+.env
+*.env
