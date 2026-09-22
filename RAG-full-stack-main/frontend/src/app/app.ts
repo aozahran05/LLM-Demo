@@ -1,6 +1,11 @@
-import { Component, signal } from '@angular/core';
+import { Component, signal, ViewChild, ElementRef, inject, ChangeDetectorRef } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Chat } from './services/chat';
+
+export interface Message {
+  text: string;
+  sender: 'user' | 'bot';
+}
 
 @Component({
   imports: [FormsModule],
@@ -10,48 +15,62 @@ import { Chat } from './services/chat';
 })
 export class App {
 
-  protected readonly title = signal('frontend');
+  private chatService = inject(Chat);
+  private cdr = inject(ChangeDetectorRef);
 
-  message = '';
+  message = signal('');
+  isLoading = signal(false);
 
-  messages: { text: string; sender: string }[] = [
+  messages = signal<Message[]>([
     {
       text: 'Hello! How can I help you with your invoices?',
       sender: 'bot'
     }
-  ];
+  ]);
 
-  constructor(private chatService: Chat) {}
+  @ViewChild('messagesContainer') private messagesContainer?: ElementRef<HTMLDivElement>;
 
   sendMessage() {
+    const textToSend = this.message().trim();
 
-    if (this.message.trim() === '') {
+    if (!textToSend || this.isLoading()) {
       return;
     }
 
-    this.messages.push({
-      text: this.message,
-      sender: 'user'
-    });
+    // 1. Immediately append user message
+    this.messages.update((msgs) => [...msgs, { text: textToSend, sender: 'user' }]);
+    this.message.set('');
+    this.isLoading.set(true);
+    this.scrollToBottom();
 
-    this.chatService.sendMessage(this.message).subscribe({
-
+    // 2. Dispatch request
+    this.chatService.sendMessage(textToSend).subscribe({
       next: (response: any) => {
-        this.messages.push({
-          text: response.response,
-          sender: 'bot'
-        });
+        const botReply = response?.response || response?.answer || 'I could not retrieve an answer.';
+        this.messages.update((msgs) => [...msgs, { text: botReply, sender: 'bot' }]);
+        this.isLoading.set(false);
+        this.cdr.markForCheck();
+        this.scrollToBottom();
       },
 
-      error: () => {
-        this.messages.push({
-          text: 'Something went wrong. Please try again.',
-          sender: 'bot'
-        });
+      error: (err) => {
+        console.error('Chat error:', err);
+        this.messages.update((msgs) => [
+          ...msgs,
+          { text: 'Something went wrong. Please try again.', sender: 'bot' }
+        ]);
+        this.isLoading.set(false);
+        this.cdr.markForCheck();
+        this.scrollToBottom();
       }
-
     });
+  }
 
-    this.message = '';
+  private scrollToBottom() {
+    setTimeout(() => {
+      if (this.messagesContainer?.nativeElement) {
+        this.messagesContainer.nativeElement.scrollTop = this.messagesContainer.nativeElement.scrollHeight;
+      }
+    }, 50);
   }
 }

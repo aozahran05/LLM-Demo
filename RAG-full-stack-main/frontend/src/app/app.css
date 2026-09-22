@@ -72,3 +72,19 @@
   background: #f1f1f1;
   margin-right: auto;
 }
+
+.typing-indicator {
+  color: #666;
+  font-style: italic;
+  opacity: 0.8;
+}
+
+.chat-input button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.chat-input input:disabled {
+  background-color: #f8f8f8;
+  cursor: not-allowed;
+}

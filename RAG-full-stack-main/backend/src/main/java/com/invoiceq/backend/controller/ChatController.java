@@ -3,6 +3,7 @@ package com.invoiceq.backend.controller;
 import com.invoiceq.backend.security.AuthenticatedUser;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.client.RestClient;
@@ -21,7 +22,10 @@ public class ChatController {
     public ChatController(
             @Value("${ai.service.url}") String aiServiceUrl,
             @Value("${ai.default-company-name}") String defaultCompanyName) {
-        this.aiClient = RestClient.builder().baseUrl(aiServiceUrl).build();
+        this.aiClient = RestClient.builder()
+                .requestFactory(new SimpleClientHttpRequestFactory())
+                .baseUrl(aiServiceUrl)
+                .build();
         this.defaultCompanyName = defaultCompanyName;
     }
 
@@ -32,27 +36,44 @@ public class ChatController {
 
         String message = request.getOrDefault("message", "");
         String companyName = resolveCompanyName(request, user);
+        String sessionId = request.getOrDefault("session_id", "default");
+        String username = resolveUsername(request, user);
 
-        Map<String, Object> aiRequest = Map.of(
-                "company_name", companyName,
-                "question", message
-        );
+        Map<String, Object> aiRequest = new LinkedHashMap<>();
+        aiRequest.put("company_name", companyName);
+        aiRequest.put("question", message);
+        aiRequest.put("session_id", sessionId);
+        aiRequest.put("username", username);
 
-        Map<String, Object> aiResponse = aiClient.post()
-                .uri("/api/ai/ask")
-                .contentType(MediaType.APPLICATION_JSON)
-                .body(aiRequest)
-                .retrieve()
-                .body(Map.class);
+        try {
+            Map<String, Object> aiResponse = aiClient.post()
+                    .uri("/api/ai/ask")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(aiRequest)
+                    .retrieve()
+                    .body(Map.class);
 
-        String answer = aiResponse == null
-                ? "No response from AI service."
-                : String.valueOf(aiResponse.getOrDefault("answer", ""));
+            String answer = aiResponse == null
+                    ? "No response from AI service."
+                    : String.valueOf(aiResponse.getOrDefault("answer", ""));
 
-        Map<String, String> result = new LinkedHashMap<>();
-        result.put("answer", answer);
-        result.put("response", answer);
-        return result;
+            Map<String, String> result = new LinkedHashMap<>();
+            result.put("answer", answer);
+            result.put("response", answer);
+            return result;
+        } catch (org.springframework.web.client.HttpStatusCodeException ex) {
+            String errorMsg = "AI Service Error: " + ex.getResponseBodyAsString();
+            Map<String, String> result = new LinkedHashMap<>();
+            result.put("answer", errorMsg);
+            result.put("response", errorMsg);
+            return result;
+        } catch (Exception ex) {
+            String errorMsg = "Error connecting to AI service: " + ex.getMessage();
+            Map<String, String> result = new LinkedHashMap<>();
+            result.put("answer", errorMsg);
+            result.put("response", errorMsg);
+            return result;
+        }
     }
 
     private String resolveCompanyName(Map<String, String> request, AuthenticatedUser user) {
@@ -66,5 +87,18 @@ public class ChatController {
         }
 
         return defaultCompanyName;
+    }
+
+    private String resolveUsername(Map<String, String> request, AuthenticatedUser user) {
+        if (user != null && user.email() != null && !user.email().isBlank()) {
+            return user.email();
+        }
+
+        String requested = request.get("username");
+        if (requested != null && !requested.isBlank()) {
+            return requested;
+        }
+
+        return "guest";
     }
 }

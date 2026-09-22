@@ -21,4 +21,16 @@ public class Invoice {
 
     private BigDecimal amount;
 
+    private String status;
+
+    @Column(name="due_date")
+    private java.time.LocalDate dueDate;
+
+    private String description;
+
+    @Column(name="account_number")
+    private String accountNumber;
+
+    private String username;
+
 }
